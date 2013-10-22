@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -30,6 +31,7 @@ type Server struct {
 	datacenterId  int
 	lastTimestamp int64
 	sequence      int32
+	mutex         sync.Mutex
 }
 
 var (
@@ -79,6 +81,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func (s *Server) Next() (int64, error) {
 	t := now()
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	if t < s.lastTimestamp {
 		return -1, fmt.Errorf("invalid system clock")
 	}
@@ -102,6 +106,7 @@ func (s *Server) Next() (int64, error) {
 func (s *Server) nextMillis() int64 {
 	t := now()
 	for t <= s.lastTimestamp {
+		time.Sleep(100 * time.Microsecond)
 		t = now()
 	}
 	return t
