@@ -80,9 +80,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) Next() (int64, error) {
-	t := now()
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	t := now()
 	if t < s.lastTimestamp {
 		return -1, fmt.Errorf("invalid system clock")
 	}
@@ -99,7 +99,7 @@ func (s *Server) Next() (int64, error) {
 	dp := int64(s.datacenterId << DatacenterShift)
 	sp := int64(s.serverId << ServerShift)
 	n := tp | dp | sp | int64(s.sequence)
-	log.Print(n, t, s.datacenterId, s.serverId, s.sequence)
+	//log.Print(n, t, s.datacenterId, s.serverId, s.sequence)
 	return n, nil
 }
 
