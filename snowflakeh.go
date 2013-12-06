@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"runtime"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -22,23 +23,36 @@ const ServerMax int = -1 ^ (-1 << ServerBits)
 
 const SequenceMask int32 = -1 ^ (-1 << SequenceBits)
 
-type Server struct {
-	port          int
+type Worker struct {
 	serverId      int
 	lastTimestamp int64
 	sequence      int32
-	mutex         sync.Mutex
 }
 
-func NewServer(p, s int) *Server {
-	if s < 0 || ServerMax < s {
+type Server struct {
+	port    int
+	workers chan *Worker
+}
+
+func NewWorker(serverId int) *Worker {
+	if serverId < 0 || ServerMax < serverId {
 		panic(fmt.Errorf("invalid server Id"))
 	}
-	return &Server{
-		port:          p,
-		serverId:      s,
+	return &Worker{
+		serverId:      serverId,
 		lastTimestamp: 0,
 		sequence:      0,
+	}
+}
+
+func NewServer(port, serverId, serverNum int) *Server {
+	workers := make(chan *Worker, serverNum)
+	for n := 0; n < serverNum; n++ {
+		workers <- NewWorker(serverId + n)
+	}
+	return &Server{
+		port:    port,
+		workers: workers,
 	}
 }
 
@@ -66,8 +80,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) Next() (int64, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	worker := <-s.workers
+	id, err := worker.Next()
+	s.workers <- worker
+	return id, err
+}
+
+func (s *Worker) Next() (int64, error) {
 	t := now()
 	if t < s.lastTimestamp {
 		return -1, fmt.Errorf("invalid system clock")
@@ -88,7 +107,7 @@ func (s *Server) Next() (int64, error) {
 	return n, nil
 }
 
-func (s *Server) nextMillis() int64 {
+func (s *Worker) nextMillis() int64 {
 	t := now()
 	for t <= s.lastTimestamp {
 		time.Sleep(100 * time.Microsecond)
@@ -105,12 +124,21 @@ func now() int64 {
 	return nowi
 }
 
+func now2() int64 {
+	return time.Now().UnixNano() / 1000 / 1000
+}
+
 func main() {
+	if os.Getenv("GOMAXPROCS") == "" {
+		runtime.GOMAXPROCS(runtime.NumCPU())
+	}
 	var portNumber int
 	var serverId int
-	flag.Parse()
+	var serverNum int
 	flag.IntVar(&portNumber, "port", 8181, "port")
 	flag.IntVar(&serverId, "server", 0, "server")
-	server := NewServer(portNumber, serverId)
+	flag.IntVar(&serverNum, "num", 1, "num")
+	flag.Parse()
+	server := NewServer(portNumber, serverId, serverNum)
 	log.Fatal(server.ListenAndServe())
 }
