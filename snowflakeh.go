@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"runtime"
 	"strconv"
 	"time"
@@ -117,28 +116,22 @@ func (s *Worker) nextMillis() int64 {
 }
 
 func now() int64 {
-	now := time.Now()
-	nows := int64(now.Unix() * 1000)
-	nowm := int64(now.Nanosecond()) / time.Millisecond.Nanoseconds()
-	nowi := nows + nowm
-	return nowi
-}
-
-func now2() int64 {
-	return time.Now().UnixNano() / 1000 / 1000
+	return time.Now().UnixNano() / 1000000
 }
 
 func main() {
-	if os.Getenv("GOMAXPROCS") == "" {
-		runtime.GOMAXPROCS(runtime.NumCPU())
-	}
 	var portNumber int
 	var serverId int
 	var serverNum int
+	var maxProcs int
 	flag.IntVar(&portNumber, "port", 8181, "port")
 	flag.IntVar(&serverId, "server", 0, "server")
 	flag.IntVar(&serverNum, "num", 1, "num")
+	flag.IntVar(&maxProcs, "proc", 0, "proc")
 	flag.Parse()
+	if maxProcs == 0 {
+		runtime.GOMAXPROCS(runtime.NumCPU())
+	}
 	server := NewServer(portNumber, serverId, serverNum)
 	log.Fatal(server.ListenAndServe())
 }

@@ -120,3 +120,9 @@ func TestServerNextUnique(t *testing.T) {
 		ids[i] = m
 	}
 }
+
+func BenchmarkNow(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		now()
+	}
+}
